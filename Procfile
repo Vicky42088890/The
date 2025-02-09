@@ -1,1 +1,1 @@
-echo "web: python rc.py" >
+echo "web: python rc.py" > Procfile
