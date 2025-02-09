@@ -1,89 +1,78 @@
 from flask import Flask, request, render_template_string
 import requests
-import re
 import time
+import re
 
 app = Flask(__name__)
 
-class FacebookCommenter:
-    def __init__(self):
-        self.comment_count = 0
+# HTML Template
+html = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Facebook Auto Comment - Raghu ACC Rullx Boy</title>
+    <style>
+        body { background-color: #f4f4f4; font-family: Arial; text-align: center; padding: 20px; }
+        input, button { padding: 10px; margin: 5px; width: 300px; border-radius: 5px; }
+        button { background-color: #007BFF; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h2>Facebook Auto Comment Tool</h2>
+    <form method="POST">
+        <input type="text" name="cookie" placeholder="Enter Your Facebook Cookie" required><br>
+        <input type="text" name="post_url" placeholder="Enter Post URL" required><br>
+        <input type="text" name="message" placeholder="Enter Your Comment" required><br>
+        <input type="number" name="delay" placeholder="Delay (in seconds)" value="10" required><br>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
+"""
 
-    def comment_on_post(self, cookie, post_id, comment):
-        with requests.Session() as r:
-            r.headers.update({
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile Safari/537.36)',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Connection': 'keep-alive',
-            })
-
-            response = r.get(f'https://mbasic.facebook.com/{post_id}', cookies={"cookie": cookie})
-            next_action = re.search('method="post" action="([^"]+)"', response.text)
-            fb_dtsg = re.search('name="fb_dtsg" value="([^"]+)"', response.text)
-            jazoest = re.search('name="jazoest" value="([^"]+)"', response.text)
-
-            if not (next_action and fb_dtsg and jazoest):
-                return "Invalid post or session expired."
-
-            post_url = f"https://mbasic.facebook.com{next_action.group(1).replace('amp;', '')}"
-            data = {
-                'fb_dtsg': fb_dtsg.group(1),
-                'jazoest': jazoest.group(1),
-                'comment_text': comment,
-                'submit': 'Submit'
-            }
-
-            result = r.post(post_url, data=data, cookies={"cookie": cookie})
-            if 'comment_success' in result.url:
-                self.comment_count += 1
-                return f"✅ Comment {self.comment_count} sent successfully!"
-            else:
-                return "❌ Failed to post comment."
+# Extract Post ID from URL
+def extract_post_id(post_url):
+    post_id_pattern = re.compile(r"posts/(\d+)")
+    match = post_id_pattern.search(post_url)
+    return match.group(1) if match else None
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    message = ""
     if request.method == "POST":
-        cookie = request.form['cookie']
-        post_id = request.form['post_id']
-        comment = request.form['comment']
-        delay = int(request.form['delay'])
+        cookie = request.form["cookie"]
+        post_url = request.form["post_url"]
+        message = request.form["message"]
+        delay = int(request.form["delay"])
 
-        commenter = FacebookCommenter()
-        for _ in range(5):  # Loop to send comment 5 times, modify as needed
+        post_id = extract_post_id(post_url)
+        if not post_id:
+            return "Invalid Post URL!"
+
+        # Facebook Graph API URL
+        comment_url = f"https://graph.facebook.com/{post_id}/comments"
+
+        headers = {
+            "cookie": cookie,
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+
+        while True:
+            data = {
+                "message": message,
+                "access_token": "EAAAAUa..."  # यहां Access Token डालना होगा
+            }
+
+            response = requests.post(comment_url, headers=headers, data=data)
+
+            if response.status_code == 200:
+                print("✅ Comment Sent Successfully!")
+            else:
+                print(f"❌ Error: {response.text}")
+
             time.sleep(delay)
-            message = commenter.comment_on_post(cookie, post_id, comment)
 
-    html_form = '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Facebook Auto Commenter - Raghu ACC Rullx Boy</title>
-        <style>
-            body { background-color: #222; color: #fff; text-align: center; font-family: Arial, sans-serif; }
-            .container { background: #333; padding: 20px; border-radius: 10px; display: inline-block; margin-top: 50px; }
-            input, button { padding: 10px; margin: 5px; width: 90%; border-radius: 5px; }
-            button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-            button:hover { background-color: #45a049; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Facebook Auto Commenter</h2>
-            <form method="POST">
-                Cookie: <input type="text" name="cookie" required><br>
-                Post ID: <input type="text" name="post_id" required><br>
-                Comment: <input type="text" name="comment" required><br>
-                Delay (in seconds): <input type="number" name="delay" value="5" required><br>
-                <button type="submit">Submit</button>
-            </form>
-            <p>{{ message }}</p>
-        </div>
-        <footer>Created by Raghu ACC Rullx Boy</footer>
-    </body>
-    </html>
-    '''
-    return render_template_string(html_form, message=message)
+    return render_template_string(html)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host="0.0.0.0", port=5000)
