@@ -1,1 +1,1 @@
-web: python ra.py
+echo "web: python rc.py" > Procfile
